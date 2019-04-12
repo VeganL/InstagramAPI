@@ -1,0 +1,30 @@
+#!/bin/bash
+#==================
+
+#Check for IG page URL parameter
+PAGE=$1
+if [ -z "$PAGE" ]; then
+  echo "\n  Usage: $0 <instagram-page-url>\n"
+  exit 255
+fi
+
+#Creates $USER for storing IG username, and the directory for the user's images
+USER=`echo "$PAGE" |sed 's/^.*\.com\///;s/\/.*$//'`
+mkdir $USER
+
+#Downloads IG HTML content in the background; saves as wget.out
+wget -q $PAGE -O wget.out
+
+#Scrapes for IG post links from wget.out; saves to array $POSTS
+declare -a POSTS
+POSTS=($(sed 's/shortcode/\nshortcode/g' wget.out |egrep --text "^shortcode" |sed 's/",.*$//g;s/^.*:"//g;s/^/https:\/\/www.instagram.com\/p\//'))
+
+#Iterates through $POSTS, scrapes through post URL's HTML content and finds image source, downloads image, and removes temp file wget.out
+for i in ${POSTS[*]};
+do
+  wget -q $i -O wget.out
+  IMGURL=`sed 's/<meta property="og:image" content="https:\/\/scontent-iad3-1.cdninstagram.com/\nhttps:\/\/scontent-iad3-1.cdninstagram.com/' wget.out | egrep --text "^https" |sed 's/".*$//'`
+  IMGNAME=`echo "$IMGURL" |sed 's/jpg.*$/jpg/;s/^.*\/\/.*\/.*\/.*\/.*\/.*\/.*\///'`
+  wget -q $IMGURL -O $USER/$IMGNAME
+  rm -rf wget.out
+done
